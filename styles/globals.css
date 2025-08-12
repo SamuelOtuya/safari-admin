@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Base document sizing to ensure full-height layouts work reliably */
+html, body, #__next {
+  height: 100%;
+} 
