@@ -14,6 +14,7 @@ interface UploadedImage {
   size: number;
   experienceType: string;
   imageIndex: number;
+  cloudinaryId?: string;
 }
 
 interface ExperienceMapping {
@@ -434,15 +435,15 @@ export default function AdminPanel() {
                         </button>
                         
                         <button
-                          onClick={() => copyToClipboard(image.url, 'full')}
+                          onClick={() => copyToClipboard(image.fullPath, 'full')}
                           className="bg-blue-600 text-white px-3 py-2 rounded text-xs hover:bg-blue-700 transition"
                         >
-                          Copy Full URL
+                          Copy Cloudinary URL
                         </button>
                       </div>
                       
                       <button
-                        onClick={() => handleDelete(image.id, image.filename)}
+                        onClick={() => handleDelete(image.id, image.cloudinaryId || image.filename)}
                         className="w-full bg-red-600 text-white px-3 py-2 rounded text-xs hover:bg-red-700 transition"
                       >
                         Delete
