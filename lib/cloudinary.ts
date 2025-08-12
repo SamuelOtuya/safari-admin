@@ -1,10 +1,21 @@
 import { v2 as cloudinary } from 'cloudinary';
 
 // Configure Cloudinary
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME || 'dwpjuqcd2';
+const apiKey = process.env.CLOUDINARY_API_KEY || '771658231332589';
+const apiSecret = process.env.CLOUDINARY_API_SECRET || 'Iv-PT8NM8C10PgYmWI58HSZStTTI';
+
+console.log('Cloudinary config:', {
+  cloudName,
+  apiKey: apiKey ? '***' + apiKey.slice(-4) : 'missing',
+  apiSecret: apiSecret ? '***' + apiSecret.slice(-4) : 'missing',
+  usingEnvVars: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+});
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dwpjuqcd2',
-  api_key: process.env.CLOUDINARY_API_KEY || '771658231332589',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'Iv-PT8NM8C10PgYmWI58HSZStTTI',
+  cloud_name: cloudName,
+  api_key: apiKey,
+  api_secret: apiSecret,
 });
 
 export default cloudinary;

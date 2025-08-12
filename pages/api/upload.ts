@@ -100,14 +100,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Check if Cloudinary credentials are missing
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.log('Environment variables missing:', {
+        cloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: !!process.env.CLOUDINARY_API_KEY,
+        apiSecret: !!process.env.CLOUDINARY_API_SECRET
+      });
       return res.status(500).json({ 
-        error: 'Cloudinary configuration missing. Please check environment variables.' 
+        error: 'Cloudinary configuration missing. Please check environment variables.',
+        debug: {
+          cloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+          apiKey: !!process.env.CLOUDINARY_API_KEY,
+          apiSecret: !!process.env.CLOUDINARY_API_SECRET
+        }
       });
     }
     
     res.status(500).json({ 
       error: 'Upload failed', 
-      details: error instanceof Error ? error.message : 'Unknown error'
+      details: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 }
