@@ -1,7 +1,7 @@
 // pages/api/upload.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
-import { v2 as cloudinary } from 'cloudinary';
+import { uploadImage } from '@/lib/cloudinary';
 import path from 'path';
 
 export const config = {
@@ -11,13 +11,6 @@ export const config = {
   },
   maxDuration: 30,
 };
-
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // Mapping of experience types to their expected filenames
 const EXPERIENCE_MAPPINGS = {
@@ -85,12 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const targetFilename = `${mapping.prefix}${imageIndex}${fileExtension}`;
 
     // Upload to Cloudinary
-    const result = await cloudinary.uploader.upload(file.filepath, {
-      public_id: `safari-admin/${targetFilename}`,
-      folder: 'safari-admin',
-      resource_type: 'image',
-      overwrite: true,
-    });
+    const result = await uploadImage(file.filepath, `safari-admin/${targetFilename}`);
 
     // Generate URL that matches your existing import structure
     const fileUrl = `/assets/${targetFilename}`;
