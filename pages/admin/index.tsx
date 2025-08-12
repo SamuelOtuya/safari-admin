@@ -456,7 +456,7 @@ export default function AdminPanel() {
         </div>
 
         {/* Instructions */}
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-6 mt-8">
+        {/* <div className="bg-blue-50 border-l-4 border-blue-400 p-6 mt-8">
           <h3 className="text-lg font-semibold text-blue-800 mb-2">How to Use</h3>
           <ol className="text-blue-700 space-y-1 text-sm">
             <li>1. Select the experience type and image slot you want to replace</li>
@@ -464,7 +464,7 @@ export default function AdminPanel() {
             <li>3. The image is now accessible at the same path your website expects</li>
             <li>4. No changes needed to your frontend code! 🎉</li>
           </ol>
-        </div>
+        </div> */}
       </div>
     </div>
   );
