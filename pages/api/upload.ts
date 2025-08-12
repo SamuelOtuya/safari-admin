@@ -7,7 +7,11 @@ import path from 'path';
 export const config = {
   api: {
     bodyParser: false,
+    // Increase response size limit for Vercel
+    responseLimit: '10mb',
   },
+  // Set maximum execution time
+  maxDuration: 30,
 };
 
 // Mapping of experience types to their expected filenames
@@ -37,9 +41,7 @@ const EXPERIENCE_MAPPINGS = {
     prefix: 'r', 
     numbers: [1, 2, 3, 4, 5, 6] // Same as breakfast
   }
-} as const;
-
-type ExperienceType = keyof typeof EXPERIENCE_MAPPINGS;
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -57,7 +59,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const form = formidable({
       uploadDir: assetsDir,
       keepExtensions: true,
-      maxFileSize: 10 * 1024 * 1024, // 10MB limit
+      maxFileSize: 5 * 1024 * 1024, // Reduced to 5MB for Vercel
+      maxFiles: 1, // Only one file at a time
+      allowEmptyFiles: false,
+      minFileSize: 1, // At least 1 byte
     });
 
     const [fields, files] = await form.parse(req);
@@ -69,24 +74,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    if (!experienceType || !(experienceType in EXPERIENCE_MAPPINGS)) {
+    if (
+      !experienceType ||
+      typeof experienceType !== 'string' ||
+      !(experienceType in EXPERIENCE_MAPPINGS)
+    ) {
       return res.status(400).json({ 
         error: 'Invalid experience type. Must be one of: ' + Object.keys(EXPERIENCE_MAPPINGS).join(', ')
       });
     }
 
-    const mapping = EXPERIENCE_MAPPINGS[experienceType as ExperienceType];
+    const mapping = EXPERIENCE_MAPPINGS[experienceType as keyof typeof EXPERIENCE_MAPPINGS];
     
     // Generate filename to match your existing structure
-    const fileExtension = path.extname(file.originalFilename || '').toLowerCase();
-    
-    // Handle special cases for extensions
-    let targetExtension = fileExtension || '.jpg';
-    if (experienceType === 'accommodation' && imageIndex === 2) {
-      targetExtension = '.webp'; // ac2.webp
-    }
-
-    const targetFilename = `${mapping.prefix}${imageIndex}${targetExtension}`;
+    const fileExtension = path.extname(file.originalFilename || '').toLowerCase() || '.jpg';
+    const targetFilename = `${mapping.prefix}${imageIndex}${fileExtension}`;
     const targetPath = path.join(assetsDir, targetFilename);
 
     // Move and rename the file

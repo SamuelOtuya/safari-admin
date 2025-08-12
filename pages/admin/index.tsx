@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useRef } from 'react';
+import SafeImage from './SafeImage';
 
 interface UploadedImage {
   id: string;
@@ -58,6 +59,41 @@ const EXPERIENCE_MAPPINGS: Record<string, ExperienceMapping> = {
     numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     displayName: 'All-Inclusive Meals',
     description: 'Meal images (m1.jpg - m10.jpg)'
+  },
+  'wildlife': {
+    folder: 'assets',
+    prefix: 'w',
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    displayName: 'Wildlife Safari',
+    description: 'Wildlife photography (w1.jpg - w10.jpg)'
+  },
+  'landscape': {
+    folder: 'assets',
+    prefix: 'l',
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    displayName: 'Landscape Views',
+    description: 'Scenic landscapes (l1.jpg - l10.jpg)'
+  },
+  'activities': {
+    folder: 'assets',
+    prefix: 'a',
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    displayName: 'Safari Activities',
+    description: 'Adventure activities (a1.jpg - a10.jpg)'
+  },
+  'sunset': {
+    folder: 'assets',
+    prefix: 's',
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    displayName: 'Sunset & Sunrise',
+    description: 'Golden hour moments (s1.jpg - s10.jpg)'
+  },
+  'guides': {
+    folder: 'assets',
+    prefix: 'g',
+    numbers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+    displayName: 'Safari Guides',
+    description: 'Professional guides (g1.jpg - g10.jpg)'
   }
 };
 
@@ -94,6 +130,12 @@ export default function AdminPanel() {
         continue;
       }
 
+      // Check file size (5MB limit for Vercel)
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 5MB.`);
+        continue;
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('experienceType', selectedExperience);
@@ -105,8 +147,9 @@ export default function AdminPanel() {
           body: formData,
         });
 
+        const result = await response.json();
+
         if (response.ok) {
-          const result = await response.json();
           const newImage: UploadedImage = {
             id: Date.now().toString() + i,
             filename: result.filename,
@@ -122,11 +165,12 @@ export default function AdminPanel() {
           setImages(prev => [newImage, ...prev]);
           alert(`✅ Uploaded as ${result.filename} - Ready to use in your website!`);
         } else {
-          const error = await response.json();
-          alert(`Failed to upload ${file.name}: ${error.error}`);
+          console.error('Upload failed:', result);
+          alert(`❌ Failed to upload ${file.name}: ${result.error}`);
         }
       } catch (error) {
-        alert(`Error uploading ${file.name}: ${error}`);
+        console.error('Upload error:', error);
+        alert(`❌ Network error uploading ${file.name}. Please try again.`);
       }
     }
     
@@ -138,6 +182,8 @@ export default function AdminPanel() {
     if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
 
     try {
+      console.log('Attempting to delete:', filename);
+      
       const response = await fetch('/api/delete', {
         method: 'DELETE',
         headers: {
@@ -146,18 +192,43 @@ export default function AdminPanel() {
         body: JSON.stringify({ filename }),
       });
 
+      const result = await response.json();
+      console.log('Delete response:', result);
+
       if (response.ok) {
         setImages(prev => prev.filter(img => img.id !== imageId));
         alert('✅ Image deleted successfully');
       } else {
-        alert('Failed to delete image');
+        console.error('Delete failed:', result);
+        alert(`❌ Failed to delete image: ${result.error}`);
+        
+        // Try alternative deletion if the filename might be different
+        if (result.error === 'File not found') {
+          const alternativeDelete = await fetch('/api/delete', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ filename: `assets/${filename}` }),
+          });
+          
+          if (alternativeDelete.ok) {
+            setImages(prev => prev.filter(img => img.id !== imageId));
+            alert('✅ Image deleted successfully (alternative path)');
+          }
+        }
       }
     } catch (error) {
-      alert(`Error deleting image: ${error}`);
+      console.error('Delete error:', error);
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      } else if (typeof error === 'string') {
+        message = error;
+      }
+      alert(`❌ Error deleting image: ${message}`);
     }
   };
-
-  // Copy URL to clipboard
   const copyToClipboard = (url: string, type: 'relative' | 'full' = 'relative') => {
     const textToCopy = type === 'full' ? `${process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3000'}${url}` : url;
     navigator.clipboard.writeText(textToCopy);
@@ -323,12 +394,12 @@ export default function AdminPanel() {
               {images.map((image) => (
                 <div key={image.id} className="border rounded-lg overflow-hidden shadow-sm">
                   <div className="relative h-48">
-                    {/* <SafeImage
+                    <SafeImage
                       src={image.fullPath}
                       alt={image.filename}
                       fill
                       className="object-cover"
-                    /> */}
+                    />
                   </div>
                   
                   <div className="p-4">
@@ -385,7 +456,15 @@ export default function AdminPanel() {
         </div>
 
         {/* Instructions */}
-       ?
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-6 mt-8">
+          <h3 className="text-lg font-semibold text-blue-800 mb-2">How to Use</h3>
+          <ol className="text-blue-700 space-y-1 text-sm">
+            <li>1. Select the experience type and image slot you want to replace</li>
+            <li>2. Upload your new image - it will automatically get the correct filename</li>
+            <li>3. The image is now accessible at the same path your website expects</li>
+            <li>4. No changes needed to your frontend code! 🎉</li>
+          </ol>
+        </div>
       </div>
     </div>
   );
