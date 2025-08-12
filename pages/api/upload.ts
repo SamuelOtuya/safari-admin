@@ -1,18 +1,23 @@
 // pages/api/upload.ts
 import { NextApiRequest, NextApiResponse } from 'next';
 import formidable from 'formidable';
-import fs from 'fs';
+import { v2 as cloudinary } from 'cloudinary';
 import path from 'path';
 
 export const config = {
   api: {
     bodyParser: false,
-    // Increase response size limit for Vercel
     responseLimit: '10mb',
   },
-  // Set maximum execution time
   maxDuration: 30,
 };
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // Mapping of experience types to their expected filenames
 const EXPERIENCE_MAPPINGS = {
@@ -41,7 +46,9 @@ const EXPERIENCE_MAPPINGS = {
     prefix: 'r', 
     numbers: [1, 2, 3, 4, 5, 6] // Same as breakfast
   }
-};
+} as const;
+
+type ExperienceType = keyof typeof EXPERIENCE_MAPPINGS;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -49,20 +56,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Create assets directory to match your existing structure
-    const assetsDir = path.join(process.cwd(), 'public', 'assets');
-    
-    if (!fs.existsSync(assetsDir)) {
-      fs.mkdirSync(assetsDir, { recursive: true });
-    }
-
     const form = formidable({
-      uploadDir: assetsDir,
-      keepExtensions: true,
-      maxFileSize: 5 * 1024 * 1024, // Reduced to 5MB for Vercel
-      maxFiles: 1, // Only one file at a time
+      maxFileSize: 5 * 1024 * 1024, // 5MB limit
+      maxFiles: 1,
       allowEmptyFiles: false,
-      minFileSize: 1, // At least 1 byte
+      minFileSize: 1,
     });
 
     const [fields, files] = await form.parse(req);
@@ -74,25 +72,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    if (
-      !experienceType ||
-      typeof experienceType !== 'string' ||
-      !(experienceType in EXPERIENCE_MAPPINGS)
-    ) {
+    if (!experienceType || !(experienceType in EXPERIENCE_MAPPINGS)) {
       return res.status(400).json({ 
         error: 'Invalid experience type. Must be one of: ' + Object.keys(EXPERIENCE_MAPPINGS).join(', ')
       });
     }
 
-    const mapping = EXPERIENCE_MAPPINGS[experienceType as keyof typeof EXPERIENCE_MAPPINGS];
+    const mapping = EXPERIENCE_MAPPINGS[experienceType as ExperienceType];
     
     // Generate filename to match your existing structure
     const fileExtension = path.extname(file.originalFilename || '').toLowerCase() || '.jpg';
     const targetFilename = `${mapping.prefix}${imageIndex}${fileExtension}`;
-    const targetPath = path.join(assetsDir, targetFilename);
 
-    // Move and rename the file
-    fs.renameSync(file.filepath, targetPath);
+    // Upload to Cloudinary
+    const result = await cloudinary.uploader.upload(file.filepath, {
+      public_id: `safari-admin/${targetFilename}`,
+      folder: 'safari-admin',
+      resource_type: 'image',
+      overwrite: true,
+    });
 
     // Generate URL that matches your existing import structure
     const fileUrl = `/assets/${targetFilename}`;
@@ -105,11 +103,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       size: file.size,
       experienceType,
       imageIndex,
-      fullPath: `${process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3000'}${fileUrl}`
+      fullPath: result.secure_url, // Use Cloudinary URL
+      cloudinaryId: result.public_id,
     });
 
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    
+    // Check if Cloudinary credentials are missing
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ 
+        error: 'Cloudinary configuration missing. Please check environment variables.' 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Upload failed', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
