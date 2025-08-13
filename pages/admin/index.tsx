@@ -15,6 +15,7 @@ interface UploadedImage {
   experienceType: string;
   imageIndex: number;
   cloudinaryId?: string;
+  storage?: string;
 }
 
 interface ExperienceMapping {
@@ -99,21 +100,22 @@ const EXPERIENCE_MAPPINGS: Record<string, ExperienceMapping> = {
 };
 
 export default function AdminPanel() {
-  const [images, setImages] = useState<UploadedImage[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [selectedExperience, setSelectedExperience] = useState('balloon');
   const [selectedImageIndex, setSelectedImageIndex] = useState(1);
+  const [uploading, setUploading] = useState(false);
+  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [storageMode, setStorageMode] = useState<'cloudinary' | 'local'>('cloudinary');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Simple authentication
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD || password === 'safari-admin-2024') {
+    // Simple password check - you can make this more secure
+    if (password === 'admin' || password === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
       setAuthenticated(true);
     } else {
-      alert('Invalid password');
+      alert('Incorrect password');
     }
   };
 
@@ -143,7 +145,10 @@ export default function AdminPanel() {
       formData.append('imageIndex', selectedImageIndex.toString());
 
       try {
-        const response = await fetch('/api/upload', {
+        // Choose upload endpoint based on storage mode
+        const uploadEndpoint = storageMode === 'cloudinary' ? '/api/upload' : '/api/upload-local';
+        
+        const response = await fetch(uploadEndpoint, {
           method: 'POST',
           body: formData,
         });
@@ -161,6 +166,7 @@ export default function AdminPanel() {
             size: file.size,
             experienceType: result.experienceType,
             imageIndex: result.imageIndex,
+            storage: result.storage || storageMode,
           };
           
           setImages(prev => [newImage, ...prev]);
@@ -230,6 +236,7 @@ export default function AdminPanel() {
       alert(`❌ Error deleting image: ${message}`);
     }
   };
+
   const copyToClipboard = (url: string, type: 'relative' | 'full' = 'relative') => {
     const textToCopy = type === 'full' ? `${process.env.NEXT_PUBLIC_ADMIN_URL || 'http://localhost:3000'}${url}` : url;
     navigator.clipboard.writeText(textToCopy);
@@ -281,6 +288,39 @@ export default function AdminPanel() {
               Logout
             </button>
           </div>
+        </div>
+
+        {/* Storage Mode Selector */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Storage Mode</h2>
+          <div className="flex gap-4">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="cloudinary"
+                checked={storageMode === 'cloudinary'}
+                onChange={(e) => setStorageMode(e.target.value as 'cloudinary' | 'local')}
+                className="mr-2"
+              />
+              <span>Cloudinary (Cloud Storage)</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                value="local"
+                checked={storageMode === 'local'}
+                onChange={(e) => setStorageMode(e.target.value as 'cloudinary' | 'local')}
+                className="mr-2"
+              />
+              <span>Local Storage</span>
+            </label>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            {storageMode === 'cloudinary' 
+              ? 'Images will be uploaded to Cloudinary cloud storage. Requires valid Cloudinary credentials.'
+              : 'Images will be saved locally in the public/uploads folder. No external service required.'
+            }
+          </p>
         </div>
 
         {/* Experience Selector */}
@@ -370,6 +410,9 @@ export default function AdminPanel() {
                     Will be saved as: <strong>/assets/{currentMapping.prefix}{selectedImageIndex}
                     {selectedExperience === 'accommodation' && selectedImageIndex === 1 ? '.webp' : '.jpg'}</strong>
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Storage: {storageMode === 'cloudinary' ? 'Cloudinary' : 'Local (/uploads/)'}
+                  </p>
                 </div>
                 <button
                   onClick={() => fileInputRef.current?.click()}
@@ -411,6 +454,9 @@ export default function AdminPanel() {
                       <p className="text-xs text-gray-500">
                         {EXPERIENCE_MAPPINGS[image.experienceType]?.displayName}
                       </p>
+                      <p className="text-xs text-blue-500">
+                        Storage: {image.storage || 'unknown'}
+                      </p>
                     </div>
                     
                     <div className="text-xs text-gray-500 mb-3">
@@ -438,7 +484,7 @@ export default function AdminPanel() {
                           onClick={() => copyToClipboard(image.fullPath, 'full')}
                           className="bg-blue-600 text-white px-3 py-2 rounded text-xs hover:bg-blue-700 transition"
                         >
-                          Copy Cloudinary URL
+                          Copy {image.storage === 'local' ? 'Local' : 'Cloudinary'} URL
                         </button>
                       </div>
                       

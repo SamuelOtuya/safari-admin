@@ -44,6 +44,24 @@ const EXPERIENCE_MAPPINGS = {
 type ExperienceType = keyof typeof EXPERIENCE_MAPPINGS;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method === 'GET') {
+    // Test endpoint
+    return res.status(200).json({
+      success: true,
+      message: 'Upload API is working!',
+      cloudinaryConfig: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'missing',
+        apiSecret: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'missing'
+      },
+      envVars: {
+        cloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: !!process.env.CLOUDINARY_API_KEY,
+        apiSecret: !!process.env.CLOUDINARY_API_SECRET
+      }
+    });
+  }
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -98,6 +116,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error) {
     console.error('Upload error:', error);
     
+    // Enhanced error handling with more debugging info
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    // Check if it's a Cloudinary configuration error
+    if (errorMessage.includes('not configured') || errorMessage.includes('check your .env file')) {
+      return res.status(500).json({ 
+        error: 'Cloudinary not configured. Please check your .env file.',
+        details: errorMessage,
+        debug: {
+          cloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
+          apiKey: !!process.env.CLOUDINARY_API_KEY,
+          apiSecret: !!process.env.CLOUDINARY_API_SECRET
+        }
+      });
+    }
+    
+    // Check if it's a Cloudinary authentication error
+    if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('Invalid signature')) {
+      return res.status(500).json({ 
+        error: 'Cloudinary authentication failed. Please check your API credentials in .env file.',
+        details: errorMessage,
+        debug: {
+          cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+          apiKey: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'missing',
+          apiSecret: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'missing'
+        }
+      });
+    }
+    
+    // Check if it's a file system error
+    if (errorMessage.includes('ENOENT') || errorMessage.includes('no such file')) {
+      return res.status(500).json({ 
+        error: 'File system error. The uploaded file could not be processed.',
+        details: errorMessage
+      });
+    }
+    
     // Check if Cloudinary credentials are missing
     if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
       console.log('Environment variables missing:', {
@@ -117,8 +173,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     res.status(500).json({ 
       error: 'Upload failed', 
-      details: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
+      details: errorMessage,
+      stack: errorStack,
+      debug: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'missing',
+        apiSecret: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'missing'
+      }
     });
   }
 }

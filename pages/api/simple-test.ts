@@ -1,26 +1,37 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { testCloudinaryConnection } from '@/lib/cloudinary';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
-    res.status(200).json({
-      success: true,
-      message: 'API is working!',
-      timestamp: new Date().toISOString(),
-      env: {
-        nodeEnv: process.env.NODE_ENV,
-        hasCloudinaryCloudName: !!process.env.CLOUDINARY_CLOUD_NAME,
-        hasCloudinaryApiKey: !!process.env.CLOUDINARY_API_KEY,
-        hasCloudinaryApiSecret: !!process.env.CLOUDINARY_API_SECRET,
-      }
-    });
+    // Test Cloudinary connection using the new helper function
+    const result = await testCloudinaryConnection();
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: 'Cloudinary connection test successful!',
+        ping: result.ping,
+        config: {
+          cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+          apiKey: process.env.CLOUDINARY_API_KEY ? '***' + process.env.CLOUDINARY_API_KEY.slice(-4) : 'missing',
+          apiSecret: process.env.CLOUDINARY_API_SECRET ? '***' + process.env.CLOUDINARY_API_SECRET.slice(-4) : 'missing'
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Cloudinary connection test failed',
+        details: result.error,
+        config: result.details
+      });
+    }
+
   } catch (error) {
-    res.status(500).json({ 
+    console.error('Simple test error:', error);
+    
+    res.status(500).json({
       success: false,
-      error: 'Simple test failed',
+      error: 'Cloudinary connection test failed',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
